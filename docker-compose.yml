@@ -27,22 +27,22 @@ services:
     volumes:
       - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
     environment:
-      - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/event/{{ .EventType }}
-      - INTEGRATION__MQTT__STATE_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/state/{{ .StateType }}
-      - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/command/#
+      - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/event/{{ .EventType }}
+      - INTEGRATION__MQTT__STATE_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/state/{{ .StateType }}
+      - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=cn470_10/gateway/{{ .GatewayID }}/command/#
     depends_on:
       - mosquitto
   
-  chirpstack-gateway-bridge-basicstation:
-    image: chirpstack/chirpstack-gateway-bridge:4
-    restart: unless-stopped
-    command: -c /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge-basicstation-eu868.toml
-    ports:
-      - 3001:3001
-    volumes:
-      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
-    depends_on:
-      - mosquitto
+#  chirpstack-gateway-bridge-basicstation:
+#    image: chirpstack/chirpstack-gateway-bridge:4
+#    restart: unless-stopped
+#    command: -c /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge-basicstation-eu868.toml
+#    ports:
+#      - 3001:3001
+#    volumes:
+#      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
+#    depends_on:
+#      - mosquitto
 
   chirpstack-rest-api:
     image: chirpstack/chirpstack-rest-api:4
@@ -58,15 +58,17 @@ services:
     restart: unless-stopped
     volumes:
       - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
-      - postgresqldata:/var/lib/postgresql/data
+      - ${BASE_PATH}/postgres:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD=root
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
     volumes:
-      - redisdata:/data
+      - ${BASE_PATH}/redis:/data
 
   mosquitto:
     image: eclipse-mosquitto:2
@@ -74,7 +76,122 @@ services:
     ports:
       - 1883:1883
     volumes: 
-      - ./configuration/mosquitto/config/:/mosquitto/config/
+      - ./configuration/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+#  xxl-job:
+#    image: xuxueli/xxl-job-admin:2.2.0
+#    restart: unless-stopped
+
+  zookeeper:
+    image: ${ZOOKEEPER_IMAGE}
+    restart: unless-stopped
+    ports:
+      - '2181:2181'
+    environment:
+      - TZ=Asia/Shanghai
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - ${BASE_PATH}/zookeeper/data:/data
+      - ${BASE_PATH}/zookeeper/datalog:/datalog
+      - ${BASE_PATH}/zookeeper/logs:/logs
+
+  traefik:
+    image: ${TRAEFIK_IMAGE}
+    restart: unless-stopped
+    command:
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --entryPoints.traefik.address=:9000
+      - --entryPoints.sensorweb.address=:8081
+      - --entryPoints.sensorhost.address=:53301
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - 80:80
+      - 8081:8081
+      - 443:443
+      - 19000:9000
+      - 53301:53301
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+
+  sensor-gateway-web:
+    image: ${SENSOR_GATEWAY_WEB}
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sensor-gateway-web.entrypoints=sensorweb
+      - traefik.http.routers.sensor-gateway-web.rule=PathPrefix(`/api/`, `/swagger{.+}`,`/webjars/`,`/v2`,`/actuator`)
+      - com.centurylinklabs.watchtower.enable=true
+    depends_on:
+      - zookeeper
+      - redis
+      - postgres
+      - mosquitto
+      - traefik
+    environment:
+      - TZ=Asia/Shanghai
+      - REGISTER_HOST=zookeeper
+      - logging_level_root=INFO
+      - SWAGGER_ENABLE=true
+
+  sensor-module-auth:
+    image: ${SENSOR_MODULE_AUTH}
+    restart: unless-stopped
+    depends_on:
+      - sensor-gateway-web
+    environment:
+      - TZ=Asia/Shanghai
+      - JAVA_OPTS=-Xmx512m
+      - spring_flyway_enabled=true
+      - spring_flyway_baselineOnMigrate=true
+      - spring_flyway_baselineVersion=0
+      - REGISTER_HOST=zookeeper
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sensor-monitor
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_REDIS_HOST=redis
+      - MQTT_ISENABLED=true
+      - MQTT_SERVER_HOST=mosquitto
+      - MQTT_SERVER_PORT=1883
+      - logging_level_root=INFO
+      - authentication_expirationTime=2628000
+      - SWAGGER_ENABLE=true
+
+  sensor-module-core:
+    image: ${SENSOR_MODULE_CORE}
+    restart: unless-stopped
+    depends_on:
+      - sensor-module-auth
+    environment:
+      - TZ=Asia/Shanghai
+      - spring_flyway_enabled=true
+      - spring_flyway_baselineOnMigrate=true
+      - spring_flyway_baselineVersion=0
+      - REGISTER_HOST=zookeeper
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/sensor-monitor
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_REDIS_HOST=redis
+      - MQTT_ISENABLED=true
+      - MQTT_SERVER_HOST=mosquitto
+      - MQTT_SERVER_PORT=1883
+      - logging_level_root=INFO
+      - SWAGGER_ENABLE=true
+
+  sensor-monitor-web:
+    image: ${SENSOR_MONITOR_WEB}
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sensor-monitor-web.entrypoints=sensorweb
+      - traefik.http.routers.sensor-monitor-web.rule=PathPrefix(`/`)
 
 volumes:
   postgresqldata:
