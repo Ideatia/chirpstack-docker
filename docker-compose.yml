@@ -79,6 +79,34 @@ services:
     volumes:
       - ./configuration/mosquitto/config/:/mosquitto/config/
 
+  influxdb:
+    image: influxdb:2.7.4
+    restart: unless-stopped
+    ports:
+      - 8086:8086
+    volumes:
+      - ${BASE_PATH}/influxdbdata:/var/lib/influxdb2
+      - ${BASE_PATH}/influxdbconfig:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${DOCKER_INFLUXDB_INIT_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+
+  influx-traffic:
+    image: ${SENSOR_GATEWAY_TRAFFIC}
+    restart: unless-stopped
+    ports:
+      - 13000:3000
+    environment:
+      - INFLUX_HOST=influxdb
+      - INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - INFLUX_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - INFLUX_ORG_ID=${DOCKER_INFLUXDB_INIT_ORG_ID}
+
   zookeeper:
     image: ${ZOOKEEPER_IMAGE}
     restart: unless-stopped
