@@ -95,7 +95,7 @@ services:
       - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
   influx-traffic:
-    image: influxdb:2.7.4
+    image: ${SENSOR_GATEWAY_TRAFFIC}
     restart: unless-stopped
     ports:
       - 13000:3000
