@@ -94,3 +94,12 @@ services:
       - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
       - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+  influx-traffic:
+    image: influxdb:2.7.4
+    restart: unless-stopped
+    env_file:
+      - influxdb-traffic.env
+    ports:
+      - 13000:3000
+    environment:
+      - INFLUX_HOST=influxdb
