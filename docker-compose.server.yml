@@ -117,3 +117,15 @@ services:
       - traefik.enable=true
       - traefik.http.routers.sensor-monitor-web.entrypoints=sensorweb
       - traefik.http.routers.sensor-monitor-web.rule=PathPrefix(`/`)
+
+  influx-traffic:
+    image: ${SENSOR_GATEWAY_TRAFFIC}
+    restart: unless-stopped
+    ports:
+      - 13000:3000
+    environment:
+      - INFLUX_HOST=http://influxdb
+      - INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - INFLUX_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - INFLUX_ORG_ID=${DOCKER_INFLUXDB_INIT_ORG_ID}
