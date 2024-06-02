@@ -188,7 +188,7 @@ services:
     ports:
       - 13000:3000
     environment:
-      - INFLUX_HOST=influxdb
+      - INFLUX_HOST=http://influxdb:8086
       - INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
       - INFLUX_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
