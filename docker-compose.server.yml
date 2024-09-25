@@ -129,8 +129,3 @@ services:
       - INFLUX_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - INFLUX_ORG=${DOCKER_INFLUXDB_INIT_ORG}
       - INFLUX_ORG_ID=${DOCKER_INFLUXDB_INIT_ORG_ID}
-      - traefik.enable=true
-      - traefik.http.routers.sensor-gateway-web.entrypoints=influxtraffic
-      - traefik.http.routers.sensor-gateway-web.rule=PathPrefix(`/api-traffic/`)
-      - traefik.http.routers.nest-app.middlewares=strip-prefix-api-traffic
-      - traefik.http.middlewares.strip-prefix-v1.stripprefix.prefixes=/api-traffic/
